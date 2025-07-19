@@ -17,7 +17,21 @@ POPPLER_PATH = os.getenv("POPPLER_PATH", None)
 
 # ✅ Validate environment variables
 if not GOOGLE_API_KEY:
-    st.error("❌ GOOGLE_API_KEY not found in environment variables. Please check your .env file.")
+    st.error("❌ GOOGLE_API_KEY not found in environment variables.")
+    st.markdown("""
+    ### 🔧 How to fix this:
+    
+    **For Streamlit Cloud:**
+    1. Go to your app settings at [share.streamlit.io](https://share.streamlit.io)
+    2. Click on your app → Settings → Secrets
+    3. Add: `GOOGLE_API_KEY = "your_api_key_here"`
+    
+    **For local development:**
+    1. Create a `.env` file in your project directory
+    2. Add: `GOOGLE_API_KEY=your_api_key_here`
+    
+    **Get your API key from:** [Google AI Studio](https://makersuite.google.com/app/apikey)
+    """)
     st.stop()
 
 # ✅ For cloud deployment, we'll need to handle PDF processing differently
