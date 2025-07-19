@@ -39,6 +39,16 @@ def is_cloud_environment():
     """Check if running in a cloud environment"""
     return os.getenv("STREAMLIT_SERVER_PORT") is not None or os.getenv("PORT") is not None
 
+# ✅ Test API key functionality
+def test_api_key():
+    """Test if the API key is working"""
+    try:
+        model = ChatGoogleGenerativeAI(model="models/gemini-1.5-flash-latest")
+        response = model.invoke("Hello, this is a test message.")
+        return True, "API key is working correctly!"
+    except Exception as e:
+        return False, f"API key test failed: {str(e)}"
+
 # ✅ Load and process the uploaded PDF
 def input_pdf_setup(uploaded_file):
     if uploaded_file is not None:
@@ -76,37 +86,82 @@ def input_pdf_setup(uploaded_file):
 
 # ✅ Send prompt + image/text + job description to Gemini
 def get_gemini_response(job_desc, pdf_content, prompt):
-    model = ChatGoogleGenerativeAI(model="models/gemini-1.5-flash-latest")
+    try:
+        model = ChatGoogleGenerativeAI(model="models/gemini-1.5-flash-latest")
 
-    # Check if pdf_content is base64 image or text
-    if isinstance(pdf_content, str) and pdf_content.startswith('data:image') or len(pdf_content) > 1000:
-        # It's likely text content from PDF
-        message = {
-            "role": "user",
-            "content": [
-                f"Job Description: {job_desc}",
-                f"Resume Content: {pdf_content}",
-                f"Analysis Request: {prompt}"
-            ]
-        }
-    else:
-        # It's base64 image
-        message = {
-            "role": "user",
-            "content": [
-                job_desc,
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{pdf_content}"
-                    }
-                },
-                prompt
-            ]
-        }
+        # Check if pdf_content is base64 image or text
+        if isinstance(pdf_content, str) and (pdf_content.startswith('data:image') or len(pdf_content) > 1000):
+            # It's likely text content from PDF
+            message = {
+                "role": "user",
+                "content": [
+                    f"Job Description: {job_desc}",
+                    f"Resume Content: {pdf_content}",
+                    f"Analysis Request: {prompt}"
+                ]
+            }
+        else:
+            # It's base64 image
+            message = {
+                "role": "user",
+                "content": [
+                    job_desc,
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{pdf_content}"
+                        }
+                    },
+                    prompt
+                ]
+            }
 
-    response = model.invoke([message])
-    return response.content
+        response = model.invoke([message])
+        return response.content
+        
+    except Exception as e:
+        error_msg = str(e)
+        if "ResourceExhausted" in error_msg:
+            return """
+            ❌ **API Quota Exceeded**
+            
+            Your Google API key has reached its quota limit. Here's how to fix this:
+            
+            **Option 1: Check Your Quota**
+            1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+            2. Check your usage and quotas
+            3. Wait for quota reset or upgrade your plan
+            
+            **Option 2: Generate New API Key**
+            1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+            2. Create a new API key
+            3. Update it in Streamlit Cloud secrets
+            
+            **Option 3: Use Local Development**
+            Run the app locally with your own API key for unlimited usage.
+            """
+        elif "InvalidArgument" in error_msg or "PermissionDenied" in error_msg:
+            return """
+            ❌ **API Key Error**
+            
+            Your Google API key appears to be invalid or doesn't have proper permissions.
+            
+            **How to fix:**
+            1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+            2. Generate a new API key
+            3. Update it in Streamlit Cloud secrets
+            """
+        else:
+            return f"""
+            ❌ **Unexpected Error**
+            
+            An error occurred while processing your request: {error_msg}
+            
+            **Troubleshooting:**
+            1. Check your internet connection
+            2. Verify your API key is correct
+            3. Try uploading a smaller PDF file
+            """
 
 
 # ✅ Streamlit UI
@@ -121,6 +176,14 @@ if uploaded_file is not None:
 
 submit1 = st.button("📌 Tell Me About the Resume")
 submit3 = st.button("📊 Percentage Match with Job Description")
+
+# Add API key test button
+if st.button("🔑 Test API Key"):
+    success, message = test_api_key()
+    if success:
+        st.success(message)
+    else:
+        st.error(message)
 
 # ✅ Prompt Templates
 input_prompt1 = """
