@@ -221,15 +221,58 @@ if st.button("🔑 Test API Key"):
 
 # ✅ Prompt Templates
 input_prompt1 = """
-You are an experienced Technical Human Resource Manager. Your task is to review the provided resume against the job description. 
-Please share your professional evaluation on whether the candidate's profile aligns with the role. 
-Highlight the strengths and weaknesses of the applicant in relation to the specified job requirements.
+You are an experienced Technical Human Resource Manager with expertise in talent acquisition and candidate evaluation. Your task is to provide a comprehensive, honest assessment of the candidate's resume against the job description.
+
+**EVALUATION CRITERIA:**
+1. **Role Alignment** - How well does the candidate's background match the job requirements?
+2. **Technical Competency** - Does the candidate have the necessary technical skills?
+3. **Experience Relevance** - Is their work experience applicable to this role?
+4. **Education & Certifications** - Do they meet the educational requirements?
+5. **Communication & Presentation** - How well is their experience communicated?
+
+**ANALYSIS REQUIREMENTS:**
+- Provide a **candid assessment** of fit (don't sugar-coat)
+- **Identify specific strengths** that make them suitable
+- **Highlight critical gaps** that could be deal-breakers
+- **Rate overall suitability** (Poor/Fair/Good/Excellent)
+- **Provide actionable feedback** for improvement
+
+**FORMAT:**
+- **Overall Assessment:** [Poor/Fair/Good/Excellent]
+- **Key Strengths:** [specific points]
+- **Critical Gaps:** [specific concerns]
+- **Recommendation:** [Hire/Consider/Reject with reasoning]
+- **Improvement Suggestions:** [specific advice]
+
+Be direct and honest. If the candidate is not a good fit, explain why clearly.
 """
 
 input_prompt3 = """
-You are a skilled ATS (Applicant Tracking System) scanner with a deep understanding of data science and ATS functionality. 
-Your task is to evaluate the resume against the provided job description. 
-Give me the percentage match, then list missing keywords, and finally provide your concluding thoughts.
+You are an expert ATS (Applicant Tracking System) scanner and HR professional. Your task is to provide a detailed, accurate analysis of the resume against the job description.
+
+**SCORING METHODOLOGY:**
+- Technical Skills: 40% (programming languages, tools, software)
+- Experience & Education: 30% (relevant work history, degrees, certifications)
+- Soft Skills: 20% (communication, leadership, teamwork)
+- Project Alignment: 10% (specific projects or achievements that match job requirements)
+
+**ANALYSIS REQUIREMENTS:**
+1. **Calculate a precise percentage match** (0-100%) based on the above criteria
+2. **Break down the score by category** (e.g., Technical: 85%, Experience: 70%, etc.)
+3. **List ALL missing keywords** from the job description that are not in the resume
+4. **Identify strengths** - what the candidate does well
+5. **Identify weaknesses** - areas for improvement
+6. **Provide specific recommendations** for resume improvement
+
+**IMPORTANT:** Be honest and critical. Don't inflate scores. If there's a poor match, say so clearly. If there's an excellent match, explain why.
+
+Format your response as:
+- **Overall Match: X%**
+- **Breakdown:** [category scores]
+- **Missing Keywords:** [list]
+- **Strengths:** [list]
+- **Weaknesses:** [list]
+- **Recommendations:** [specific advice]
 """
 
 # ✅ Button actions
@@ -243,6 +286,11 @@ if submit1 or submit3:
                     st.text(pdf_data["content"][:500] + "..." if len(pdf_data["content"]) > 500 else pdf_data["content"])
             
             selected_prompt = input_prompt1 if submit1 else input_prompt3
+            
+            # Show analysis parameters for percentage match
+            if submit3:
+                st.info("📊 **Analysis Parameters:** Technical Skills (40%) + Experience (30%) + Soft Skills (20%) + Project Alignment (10%)")
+            
             response = get_gemini_response(input_text, pdf_data, selected_prompt)
 
             st.subheader("🧠 Analysis:")
