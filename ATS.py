@@ -202,11 +202,26 @@ def get_gemini_response(job_desc, pdf_data, prompt):
 st.set_page_config(page_title="ATS Expert")
 st.header("📄 ATS Tracking System")
 
-input_text = st.text_area("🧾 Job Description:", key="input")
+input_text = st.text_area("🧾 Job Description:", key="input", 
+                         placeholder="Paste any job description here - detailed or brief. The app will adapt its analysis accordingly.")
 uploaded_file = st.file_uploader("📎 Upload your Resume (PDF only)", type=["pdf"])
 
 if uploaded_file is not None:
     st.success("✅ PDF Uploaded Successfully")
+
+# Add info about adaptive analysis
+with st.expander("ℹ️ How the Analysis Works"):
+    st.markdown("""
+    **Adaptive Analysis System:**
+    
+    🎯 **Detailed Job Descriptions:** Full comprehensive analysis using all available criteria
+    
+    📝 **Brief Job Descriptions:** Extracts key requirements and makes reasonable assumptions based on job title and industry standards
+    
+    🔍 **Vague Job Descriptions:** Focuses on transferable skills and general role expectations
+    
+    The app automatically adapts its analysis based on the level of detail in your job description!
+    """)
 
 submit1 = st.button("📌 Tell Me About the Resume")
 submit3 = st.button("📊 Percentage Match with Job Description")
@@ -221,58 +236,85 @@ if st.button("🔑 Test API Key"):
 
 # ✅ Prompt Templates
 input_prompt1 = """
-You are an experienced Technical Human Resource Manager with expertise in talent acquisition and candidate evaluation. Your task is to provide a comprehensive, honest assessment of the candidate's resume against the job description.
+You are an experienced Technical Human Resource Manager with expertise in talent acquisition and candidate evaluation. Your task is to provide a comprehensive, honest assessment of the candidate's resume against the job description, regardless of how detailed or brief the job description is.
+
+**ADAPTIVE EVALUATION APPROACH:**
+- **For detailed job descriptions:** Use all available criteria for thorough assessment
+- **For brief job descriptions:** Extract key requirements and make reasonable assumptions based on job title and industry standards
+- **For vague job descriptions:** Focus on transferable skills and general role expectations
 
 **EVALUATION CRITERIA:**
-1. **Role Alignment** - How well does the candidate's background match the job requirements?
-2. **Technical Competency** - Does the candidate have the necessary technical skills?
-3. **Experience Relevance** - Is their work experience applicable to this role?
+1. **Role Alignment** - How well does the candidate's background match the job requirements (explicit and implicit)?
+2. **Technical Competency** - Does the candidate have the necessary technical skills for the role?
+3. **Experience Relevance** - Is their work experience applicable to this position?
 4. **Education & Certifications** - Do they meet the educational requirements?
-5. **Communication & Presentation** - How well is their experience communicated?
+5. **Communication & Presentation** - How well is their experience communicated in the resume?
 
 **ANALYSIS REQUIREMENTS:**
-- Provide a **candid assessment** of fit (don't sugar-coat)
-- **Identify specific strengths** that make them suitable
+- **First, analyze the job description:** Extract requirements and note any assumptions made
+- **Provide a candid assessment** of fit (don't sugar-coat)
+- **Identify specific strengths** that make them suitable for the role
 - **Highlight critical gaps** that could be deal-breakers
-- **Rate overall suitability** (Poor/Fair/Good/Excellent)
+- **Rate overall suitability** (Poor/Fair/Good/Excellent) with reasoning
 - **Provide actionable feedback** for improvement
 
-**FORMAT:**
-- **Overall Assessment:** [Poor/Fair/Good/Excellent]
-- **Key Strengths:** [specific points]
-- **Critical Gaps:** [specific concerns]
-- **Recommendation:** [Hire/Consider/Reject with reasoning]
-- **Improvement Suggestions:** [specific advice]
+**RESPONSE FORMAT:**
+- **Job Description Summary:** [Brief analysis of what requirements were identified]
+- **Overall Assessment:** [Poor/Fair/Good/Excellent] with reasoning
+- **Key Strengths:** [specific points that make them suitable]
+- **Critical Gaps:** [specific concerns or missing requirements]
+- **Recommendation:** [Hire/Consider/Reject with detailed reasoning]
+- **Improvement Suggestions:** [specific, actionable advice]
 
-Be direct and honest. If the candidate is not a good fit, explain why clearly.
+**IMPORTANT:** Be direct and honest. If the job description is too vague, acknowledge this and provide a general assessment. If the candidate is not a good fit, explain why clearly.
 """
 
 input_prompt3 = """
-You are an expert ATS (Applicant Tracking System) scanner and HR professional. Your task is to provide a detailed, accurate analysis of the resume against the job description.
+You are an expert ATS (Applicant Tracking System) scanner and HR professional. Your task is to provide a detailed, accurate analysis of the resume against the job description, regardless of how detailed or brief the job description is.
 
-**SCORING METHODOLOGY:**
-- Technical Skills: 40% (programming languages, tools, software)
-- Experience & Education: 30% (relevant work history, degrees, certifications)
-- Soft Skills: 20% (communication, leadership, teamwork)
-- Project Alignment: 10% (specific projects or achievements that match job requirements)
+**ADAPTIVE ANALYSIS APPROACH:**
+- If job description is detailed: Use comprehensive scoring methodology
+- If job description is brief: Extract key requirements and make reasonable assumptions based on job title and industry standards
+- If job description is vague: Focus on transferable skills and general role requirements
+
+**SCORING METHODOLOGY (Adaptive):**
+- **Technical Skills: 40%** - Programming languages, tools, software, technical competencies
+- **Experience & Education: 30%** - Relevant work history, degrees, certifications, years of experience
+- **Soft Skills: 20%** - Communication, leadership, teamwork, problem-solving
+- **Role Alignment: 10%** - How well the candidate's background fits the role type
 
 **ANALYSIS REQUIREMENTS:**
-1. **Calculate a precise percentage match** (0-100%) based on the above criteria
-2. **Break down the score by category** (e.g., Technical: 85%, Experience: 70%, etc.)
-3. **List ALL missing keywords** from the job description that are not in the resume
-4. **Identify strengths** - what the candidate does well
-5. **Identify weaknesses** - areas for improvement
-6. **Provide specific recommendations** for resume improvement
+1. **First, analyze the job description:**
+   - Extract explicit requirements
+   - Identify implicit requirements based on job title
+   - Note any industry-specific expectations
 
-**IMPORTANT:** Be honest and critical. Don't inflate scores. If there's a poor match, say so clearly. If there's an excellent match, explain why.
+2. **Then, calculate a precise percentage match** (0-100%) based on available information
 
-Format your response as:
+3. **Provide detailed breakdown:**
+   - Score each category with reasoning
+   - If job description lacks detail, explain your assumptions
+
+4. **List missing keywords/skills** (both explicit and implicit)
+
+5. **Identify strengths and weaknesses** with specific examples
+
+6. **Provide actionable recommendations** for improvement
+
+**RESPONSE FORMAT:**
+- **Job Description Analysis:** [Brief summary of what you extracted]
 - **Overall Match: X%**
-- **Breakdown:** [category scores]
-- **Missing Keywords:** [list]
-- **Strengths:** [list]
-- **Weaknesses:** [list]
-- **Recommendations:** [specific advice]
+- **Breakdown:** 
+  - Technical Skills: X% (reasoning)
+  - Experience & Education: X% (reasoning)
+  - Soft Skills: X% (reasoning)
+  - Role Alignment: X% (reasoning)
+- **Missing Keywords/Skills:** [list with context]
+- **Strengths:** [specific points]
+- **Weaknesses:** [specific areas for improvement]
+- **Recommendations:** [actionable advice]
+
+**IMPORTANT:** Be honest and critical. Don't inflate scores. If the job description is too vague, say so and provide a general assessment.
 """
 
 # ✅ Button actions
