@@ -1,0 +1,14 @@
+{
+  "builds": [
+    {
+      "src": "ATS.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "ATS.py"
+    }
+  ]
+} 
