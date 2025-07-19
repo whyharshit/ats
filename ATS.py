@@ -53,16 +53,22 @@ def test_api_key():
 def input_pdf_setup(uploaded_file):
     if uploaded_file is not None:
         try:
-            # For cloud environments, we'll use a different approach
+            # For cloud environments, we'll use text extraction
             if is_cloud_environment():
-                st.warning("⚠️ PDF processing in cloud environments may have limitations. Please ensure your PDF is clear and readable.")
-                # For now, we'll extract text directly from PDF
+                st.info("📄 Processing PDF as text in cloud environment...")
+                # Extract text directly from PDF
                 import PyPDF2
                 pdf_reader = PyPDF2.PdfReader(uploaded_file)
                 text_content = ""
                 for page in pdf_reader.pages:
-                    text_content += page.extract_text()
-                return text_content
+                    text_content += page.extract_text() + "\n"
+                
+                if not text_content.strip():
+                    st.warning("⚠️ No text could be extracted from the PDF. This might be an image-based PDF.")
+                    return None
+                
+                st.success(f"✅ Successfully extracted {len(text_content)} characters from PDF")
+                return {"type": "text", "content": text_content}
             else:
                 # Local environment with Poppler
                 images = pdf2image.convert_from_bytes(uploaded_file.read(), poppler_path=POPPLER_PATH)
@@ -75,7 +81,7 @@ def input_pdf_setup(uploaded_file):
 
                 # Return base64-encoded image string
                 base64_image = base64.b64encode(image_byte_arr).decode()
-                return base64_image
+                return {"type": "image", "content": base64_image}
         except Exception as e:
             st.error(f"❌ Error processing PDF: {str(e)}")
             st.info("💡 Try uploading a different PDF or ensure it's not password-protected.")
@@ -85,36 +91,64 @@ def input_pdf_setup(uploaded_file):
 
 
 # ✅ Send prompt + image/text + job description to Gemini
-def get_gemini_response(job_desc, pdf_content, prompt):
+def get_gemini_response(job_desc, pdf_data, prompt):
     try:
         model = ChatGoogleGenerativeAI(model="models/gemini-1.5-flash-latest")
 
-        # Check if pdf_content is base64 image or text
-        if isinstance(pdf_content, str) and (pdf_content.startswith('data:image') or len(pdf_content) > 1000):
-            # It's likely text content from PDF
-            message = {
-                "role": "user",
-                "content": [
-                    f"Job Description: {job_desc}",
-                    f"Resume Content: {pdf_content}",
-                    f"Analysis Request: {prompt}"
-                ]
-            }
+        # Handle the new data structure
+        if isinstance(pdf_data, dict):
+            if pdf_data["type"] == "text":
+                # Text content from PDF
+                message = {
+                    "role": "user",
+                    "content": [
+                        f"Job Description: {job_desc}",
+                        f"Resume Content: {pdf_data['content']}",
+                        f"Analysis Request: {prompt}"
+                    ]
+                }
+            elif pdf_data["type"] == "image":
+                # Base64 image
+                message = {
+                    "role": "user",
+                    "content": [
+                        job_desc,
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{pdf_data['content']}"
+                            }
+                        },
+                        prompt
+                    ]
+                }
         else:
-            # It's base64 image
-            message = {
-                "role": "user",
-                "content": [
-                    job_desc,
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{pdf_content}"
-                        }
-                    },
-                    prompt
-                ]
-            }
+            # Fallback for old format
+            if isinstance(pdf_data, str) and len(pdf_data) > 1000:
+                # Assume it's text content
+                message = {
+                    "role": "user",
+                    "content": [
+                        f"Job Description: {job_desc}",
+                        f"Resume Content: {pdf_data}",
+                        f"Analysis Request: {prompt}"
+                    ]
+                }
+            else:
+                # Assume it's base64 image
+                message = {
+                    "role": "user",
+                    "content": [
+                        job_desc,
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{pdf_data}"
+                            }
+                        },
+                        prompt
+                    ]
+                }
 
         response = model.invoke([message])
         return response.content
@@ -201,11 +235,19 @@ Give me the percentage match, then list missing keywords, and finally provide yo
 # ✅ Button actions
 if submit1 or submit3:
     if uploaded_file is not None and input_text.strip():
-        base64_image = input_pdf_setup(uploaded_file)
-        selected_prompt = input_prompt1 if submit1 else input_prompt3
-        response = get_gemini_response(input_text, base64_image, selected_prompt)
+        pdf_data = input_pdf_setup(uploaded_file)
+        if pdf_data is not None:
+            # Show preview of extracted content
+            if pdf_data["type"] == "text":
+                with st.expander("📄 Preview Extracted Text"):
+                    st.text(pdf_data["content"][:500] + "..." if len(pdf_data["content"]) > 500 else pdf_data["content"])
+            
+            selected_prompt = input_prompt1 if submit1 else input_prompt3
+            response = get_gemini_response(input_text, pdf_data, selected_prompt)
 
-        st.subheader("🧠 Analysis:")
-        st.write(response)
+            st.subheader("🧠 Analysis:")
+            st.write(response)
+        else:
+            st.error("❌ Failed to process the PDF. Please try a different file.")
     else:
         st.warning("⚠️ Please upload a resume and enter the job description.")
