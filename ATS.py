@@ -102,9 +102,9 @@ def get_gemini_response(job_desc, pdf_data, prompt):
                 message = {
                     "role": "user",
                     "content": [
-                        f"Job Description: {job_desc}",
-                        f"Resume Content: {pdf_data['content']}",
-                        f"Analysis Request: {prompt}"
+                        f"Here is the job description: {job_desc}",
+                        f"Here is the resume content: {pdf_data['content']}",
+                        f"Now analyze the resume against the job description using this format: {prompt}"
                     ]
                 }
             elif pdf_data["type"] == "image":
@@ -112,14 +112,14 @@ def get_gemini_response(job_desc, pdf_data, prompt):
                 message = {
                     "role": "user",
                     "content": [
-                        job_desc,
+                        f"Here is the job description: {job_desc}",
                         {
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:image/jpeg;base64,{pdf_data['content']}"
                             }
                         },
-                        prompt
+                        f"Now analyze the resume against the job description using this format: {prompt}"
                     ]
                 }
         else:
@@ -129,9 +129,9 @@ def get_gemini_response(job_desc, pdf_data, prompt):
                 message = {
                     "role": "user",
                     "content": [
-                        f"Job Description: {job_desc}",
-                        f"Resume Content: {pdf_data}",
-                        f"Analysis Request: {prompt}"
+                        f"Here is the job description: {job_desc}",
+                        f"Here is the resume content: {pdf_data}",
+                        f"Now analyze the resume against the job description using this format: {prompt}"
                     ]
                 }
             else:
@@ -139,14 +139,14 @@ def get_gemini_response(job_desc, pdf_data, prompt):
                 message = {
                     "role": "user",
                     "content": [
-                        job_desc,
+                        f"Here is the job description: {job_desc}",
                         {
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:image/jpeg;base64,{pdf_data}"
                             }
                         },
-                        prompt
+                        f"Now analyze the resume against the job description using this format: {prompt}"
                     ]
                 }
 
@@ -236,46 +236,30 @@ if st.button("🔑 Test API Key"):
 
 # ✅ Prompt Templates
 input_prompt1 = """
-You are an HR professional evaluating a resume against a job description. Analyze the provided resume and job description to give your assessment.
+Analyze the resume against the job description and provide your assessment.
 
-**Your Task:** Compare the resume content with the job requirements and provide your evaluation.
-
-**Provide your analysis in this format:**
-
-**Overall Assessment:** [Poor/Fair/Good/Excellent] - [brief reasoning]
+**Overall Assessment:** [Poor/Fair/Good/Excellent] - [reasoning]
 
 **Key Strengths:** 
-- [specific strength 1]
-- [specific strength 2]
-- [specific strength 3]
+- [strength 1]
+- [strength 2]
+- [strength 3]
 
 **Critical Gaps:** 
-- [missing requirement 1]
-- [missing requirement 2]
-- [missing requirement 3]
+- [gap 1]
+- [gap 2]
+- [gap 3]
 
-**Recommendation:** [Hire/Consider/Reject] - [detailed reasoning]
+**Recommendation:** [Hire/Consider/Reject] - [reasoning]
 
 **Improvement Suggestions:** 
-- [specific advice 1]
-- [specific advice 2]
-- [specific advice 3]
-
-**Important:** Be honest and direct. If the job description is brief, make reasonable assumptions based on the job title. Focus on the actual content provided.
+- [suggestion 1]
+- [suggestion 2]
+- [suggestion 3]
 """
 
 input_prompt3 = """
-You are an ATS scanner analyzing a resume against a job description. Calculate the match percentage and provide detailed feedback.
-
-**Your Task:** Compare the resume with job requirements and calculate a percentage match.
-
-**Scoring Breakdown:**
-- Technical Skills: 40%
-- Experience & Education: 30% 
-- Soft Skills: 20%
-- Role Alignment: 10%
-
-**Provide your analysis in this format:**
+Calculate the percentage match between the resume and job description.
 
 **Overall Match: X%**
 
@@ -286,9 +270,9 @@ You are an ATS scanner analyzing a resume against a job description. Calculate t
 - Role Alignment: X% - [reasoning]
 
 **Missing Keywords/Skills:**
-- [missing skill 1]
-- [missing skill 2]
-- [missing skill 3]
+- [skill 1]
+- [skill 2]
+- [skill 3]
 
 **Strengths:**
 - [strength 1]
@@ -304,8 +288,6 @@ You are an ATS scanner analyzing a resume against a job description. Calculate t
 - [recommendation 1]
 - [recommendation 2]
 - [recommendation 3]
-
-**Important:** Be honest with scoring. If job description is brief, make reasonable assumptions based on job title. Focus on actual content provided.
 """
 
 # ✅ Button actions
