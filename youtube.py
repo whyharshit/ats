@@ -35,7 +35,6 @@ if not GOOGLE_API_KEY:
     **Get your API key from:** [Google AI Studio](https://makersuite.google.com/app/apikey)
     """)
     st.stop()
-
 st.set_page_config(page_title="YouTube Q and A", layout="centered")
 st.title("YouTube Transcript Question Answering App")
 st.write("Enter a YouTube video link and ask a question based on the transcript.")
