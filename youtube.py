@@ -16,6 +16,30 @@ st.set_page_config(page_title="YouTube Q&A", layout="centered")
 st.title("🎥 YouTube Transcript Q&A")
 st.write("Ask questions about any YouTube video with captions!")
 
+# Check API key first
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+if not GOOGLE_API_KEY:
+    st.error("❌ GOOGLE_API_KEY not found!")
+    st.markdown("""
+    ### 🔧 How to fix this:
+    
+    **1. Get your API key:**
+    - Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+    - Click "Create API Key"
+    - Copy the key
+    
+    **2. Add to .env file:**
+    Create a `.env` file in your project folder and add:
+    ```
+    GOOGLE_API_KEY=your_api_key_here
+    ```
+    
+    **3. Restart the app:**
+    Stop and run `streamlit run youtube.py` again
+    """)
+    st.stop()
+
 def extract_video_id(url):
     """Extract video ID from YouTube URL"""
     regex = r"(?:v=|\/)([0-9A-Za-z_-]{11}).*"
@@ -25,6 +49,38 @@ def extract_video_id(url):
 def format_docs(docs):
     """Format documents into context text"""
     return "\n\n".join(doc.page_content for doc in docs)
+
+def test_api_key():
+    """Test if the API key is valid"""
+    try:
+        # Test with a simple embedding
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        embeddings.embed_query("test")
+        return True, "API key is valid"
+    except Exception as e:
+        return False, str(e)
+
+# Test API key on startup
+api_valid, api_message = test_api_key()
+if not api_valid:
+    st.error("❌ Invalid API Key!")
+    st.markdown(f"""
+    **Error:** {api_message}
+    
+    ### 🔧 How to fix:
+    
+    **1. Check your API key:**
+    - Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+    - Make sure the key is active and not restricted
+    
+    **2. Update your .env file:**
+    ```
+    GOOGLE_API_KEY=your_new_api_key_here
+    ```
+    
+    **3. Restart the app**
+    """)
+    st.stop()
 
 # Input section
 video_url = st.text_input("Enter YouTube URL:", placeholder="https://www.youtube.com/watch?v=...")
@@ -100,6 +156,17 @@ if st.button("🚀 Get Answer", type="primary"):
                     - Use a VPN
                     - Wait a few minutes and try again
                     """)
+                elif "API_KEY_INVALID" in error_msg or "400" in error_msg:
+                    st.error("❌ API Key Error")
+                    st.markdown("""
+                    **Your API key is invalid or expired.**
+                    
+                    **How to fix:**
+                    1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+                    2. Create a new API key
+                    3. Update your `.env` file
+                    4. Restart the app
+                    """)
                 else:
                     st.error(f"❌ Error: {error_msg}")
                     st.info("💡 Please check your Google API key in .env file")
@@ -125,9 +192,9 @@ with st.sidebar:
     """)
     
     if st.button("🔑 Check API Key"):
-        api_key = os.getenv("GOOGLE_API_KEY")
-        if api_key:
-            st.success("✅ API key found")
+        if api_valid:
+            st.success("✅ API key is valid")
+            st.info(f"Key: {GOOGLE_API_KEY[:10]}...")
         else:
-            st.error("❌ API key not found")
-            st.info("Add GOOGLE_API_KEY to your .env file")
+            st.error("❌ API key is invalid")
+            st.info("Please update your .env file with a valid key")
