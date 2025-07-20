@@ -1,9 +1,10 @@
-import streamlit as st
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableLambda
+from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
 import re
 import os
@@ -11,53 +12,64 @@ import os
 # Load environment variables
 load_dotenv()
 
-st.set_page_config(page_title="YouTube Q and A", layout="centered")
-st.title("YouTube Transcript Question Answering App")
-st.write("Enter a YouTube video link and ask a question based on the transcript.")
-
-# Input method selection
-input_method = st.radio("Choose input method:", ["YouTube URL", "Manual Transcript"])
-
-video_url = None
-manual_transcript = None
-
-if input_method == "YouTube URL":
-    video_url = st.text_input("Enter YouTube Video URL")
-else:
-    manual_transcript = st.text_area("Paste the video transcript here:", height=200)
-    if st.button("📋 How to get transcript"):
-        st.markdown("""
-        **How to get YouTube transcript:**
-        1. Go to YouTube video
-        2. Click "..." (three dots) below video
-        3. Select "Show transcript"
-        4. Copy all text and paste above
-        """)
-
-question = st.text_input("Enter your question")
-
 def extract_video_id(url):
+    """Extract video ID from YouTube URL"""
     regex = r"(?:v=|\/)([0-9A-Za-z_-]{11}).*"
     match = re.search(regex, url)
     return match.group(1) if match else None
 
 def format_docs(retrieved_docs):
-    return "\n\n".join(doc.page_content for doc in retrieved_docs)
+    """Format retrieved documents into context text"""
+    context_text = "\n\n".join(doc.page_content for doc in retrieved_docs)
+    return context_text
 
-def process_transcript_and_answer(transcript_text, question):
-    """Process transcript and generate answer using LangChain"""
+def main():
+    print("🎥 YouTube Transcript Q&A Tool")
+    print("=" * 40)
+    
+    # Get YouTube URL or video ID
+    video_input = input("Enter YouTube URL or Video ID: ").strip()
+    
+    # Extract video ID if URL provided
+    if "youtube.com" in video_input or "youtu.be" in video_input:
+        video_id = extract_video_id(video_input)
+        if not video_id:
+            print("❌ Invalid YouTube URL. Please check and try again.")
+            return
+    else:
+        video_id = video_input
+    
+    print(f"📹 Processing video ID: {video_id}")
+    
     try:
-        # Configure for synchronous operation
-        import os
-        os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")
+        # Get transcript
+        print("🔄 Fetching transcript...")
+        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=["en"])
+        transcript = " ".join(chunk["text"] for chunk in transcript_list)
+        print(f"✅ Transcript loaded ({len(transcript)} characters)")
         
+    except TranscriptsDisabled:
+        print("❌ No captions available for this video.")
+        return
+    except Exception as e:
+        error_msg = str(e)
+        if "blocked" in error_msg.lower() or "ip" in error_msg.lower():
+            print("❌ YouTube IP Blocking Detected")
+            print("💡 Try using a different network or VPN")
+        else:
+            print(f"❌ Error fetching transcript: {error_msg}")
+        return
+    
+    # Process transcript with LangChain
+    print("🤖 Processing with AI...")
+    try:
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        chunks = splitter.create_documents([transcript_text])
-
+        chunks = splitter.create_documents([transcript])
+        
         embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
         vector_store = FAISS.from_documents(chunks, embeddings)
         retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 4})
-
+        
         llm = ChatGoogleGenerativeAI(model="models/gemini-1.5-flash-latest")
         prompt = PromptTemplate(
             template="""
@@ -70,69 +82,45 @@ def process_transcript_and_answer(transcript_text, question):
             """,
             input_variables=['context', 'question']
         )
-
-        # Get context first
-        docs = retriever.get_relevant_documents(question)
-        context = format_docs(docs)
         
-        # Generate answer directly
-        formatted_prompt = prompt.format(context=context, question=question)
-        answer = llm.invoke(formatted_prompt)
+        parallel_chain = RunnableParallel({
+            'context': retriever | RunnableLambda(format_docs),
+            'question': RunnablePassthrough()
+        })
         
-        return answer.content
-    except Exception as e:
-        raise Exception(f"Error processing transcript: {str(e)}")
-
-# Main processing logic
-if (video_url or manual_transcript) and question:
-    transcript_text = None
-    
-    if input_method == "YouTube URL":
-        video_id = extract_video_id(video_url)
+        parser = StrOutputParser()
+        chain = parallel_chain | prompt | llm | parser
         
-        if not video_id:
-            st.error("Invalid YouTube URL. Please check and try again.")
-        else:
-            with st.spinner("Loading transcript and preparing response..."):
-                try:
-                    transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=["en"])
-                    transcript_text = " ".join(chunk["text"] for chunk in transcript_list)
-                    
-                except TranscriptsDisabled:
-                    st.error("❌ Transcript is disabled for this video.")
-                    st.info("💡 Try using 'Manual Transcript' option instead.")
-                except Exception as e:
-                    error_msg = str(e)
-                    if "blocked" in error_msg.lower() or "ip" in error_msg.lower():
-                        st.error("❌ YouTube IP Blocking Detected")
-                        st.markdown("""
-                        **Quick Fix:**
-                        1. Switch to "Manual Transcript" input method
-                        2. Copy transcript from YouTube manually
-                        3. Paste and ask your question
-                        
-                        This bypasses all API restrictions!
-                        """)
-                    else:
-                        st.error(f"❌ An error occurred: {error_msg}")
-    else:
-        # Manual transcript input
-        if not manual_transcript.strip():
-            st.error("Please paste a transcript in the text area.")
-        else:
-            transcript_text = manual_transcript
-    
-    # Process transcript and generate answer
-    if transcript_text:
-        with st.spinner("Processing transcript and generating answer..."):
+        print("✅ AI model ready!")
+        
+        # Interactive Q&A loop
+        print("\n" + "=" * 40)
+        print("💬 Ask questions about the video (type 'quit' to exit)")
+        print("=" * 40)
+        
+        while True:
+            question = input("\n❓ Question: ").strip()
+            
+            if question.lower() in ['quit', 'exit', 'q']:
+                print("👋 Goodbye!")
+                break
+            
+            if not question:
+                print("Please enter a question.")
+                continue
+            
             try:
-                answer = process_transcript_and_answer(transcript_text, question)
-                st.subheader("Answer")
-                st.write(answer)
+                print("🤔 Thinking...")
+                answer = chain.invoke(question)
+                print(f"\n💡 Answer: {answer}")
                 
-                # Show transcript preview
-                with st.expander("📄 View Transcript Preview"):
-                    st.text(transcript_text[:500] + "..." if len(transcript_text) > 500 else transcript_text)
-                    
             except Exception as e:
-                st.error(f"❌ Error processing transcript: {str(e)}")
+                print(f"❌ Error: {str(e)}")
+                print("💡 Please try a different question.")
+    
+    except Exception as e:
+        print(f"❌ Error setting up AI model: {str(e)}")
+        print("💡 Please check your Google API key in .env file")
+
+if __name__ == "__main__":
+    main()
