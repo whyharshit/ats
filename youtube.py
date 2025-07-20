@@ -51,6 +51,7 @@ with st.sidebar:
     
     if use_proxy:
         st.info("💡 Proxy feature helps avoid YouTube IP blocking. Free proxies may be unreliable.")
+        st.warning("⚠️ If you encounter URL errors, try disabling proxy and use manual transcript instead.")
 
 # Main input section
 input_method = st.radio(
@@ -91,18 +92,44 @@ def extract_video_id(url):
     match = re.search(regex, url)
     return match.group(1) if match else None
 
+def validate_youtube_url(url):
+    """Validate YouTube URL format"""
+    if not url:
+        return False, "URL is empty"
+    
+    # Check for basic YouTube URL patterns
+    youtube_patterns = [
+        r'https?://(?:www\.)?youtube\.com/watch\?v=[\w-]+',
+        r'https?://youtu\.be/[\w-]+',
+        r'https?://(?:www\.)?youtube\.com/embed/[\w-]+'
+    ]
+    
+    for pattern in youtube_patterns:
+        if re.match(pattern, url):
+            return True, "Valid YouTube URL"
+    
+    return False, "Invalid YouTube URL format"
+
 def format_docs(retrieved_docs):
     return "\n\n".join(doc.page_content for doc in retrieved_docs)
 
 def get_free_proxies():
     """Get a list of free proxies (use with caution)"""
     try:
-        response = requests.get('https://api.proxyscrape.com/v2/?request=get&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all')
+        response = requests.get('https://api.proxyscrape.com/v2/?request=get&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all', timeout=10)
         if response.status_code == 200:
             proxies = response.text.strip().split('\n')
-            return [f"http://{proxy}" for proxy in proxies if proxy]
-    except:
-        pass
+            # Filter out invalid proxies and clean the URLs
+            valid_proxies = []
+            for proxy in proxies:
+                if proxy and len(proxy.strip()) > 0:
+                    # Clean the proxy string and validate format
+                    clean_proxy = proxy.strip()
+                    if ':' in clean_proxy and not any(char in clean_proxy for char in [' ', '\t', '\n', '\r']):
+                        valid_proxies.append(f"http://{clean_proxy}")
+            return valid_proxies
+    except Exception as e:
+        st.warning(f"⚠️ Could not fetch proxies: {str(e)}")
     return []
 
 def get_transcript_with_retry(video_id, max_attempts=3, use_proxy=False):
@@ -118,13 +145,22 @@ def get_transcript_with_retry(video_id, max_attempts=3, use_proxy=False):
                 proxy = random.choice(proxies)
                 st.info(f"🔄 Attempt {attempt + 1}: Trying with proxy...")
                 
-                # Configure proxy for requests
-                import os
-                os.environ['HTTP_PROXY'] = proxy
-                os.environ['HTTPS_PROXY'] = proxy
-                
-                # Add delay to avoid rate limiting
-                time.sleep(random.uniform(1, 3))
+                # Configure proxy for requests with proper validation
+                try:
+                    import os
+                    # Validate proxy URL before setting environment variables
+                    if proxy.startswith('http://') and ':' in proxy:
+                        os.environ['HTTP_PROXY'] = proxy
+                        os.environ['HTTPS_PROXY'] = proxy
+                    else:
+                        st.warning(f"⚠️ Invalid proxy format: {proxy}")
+                        continue
+                        
+                    # Add delay to avoid rate limiting
+                    time.sleep(random.uniform(1, 3))
+                except Exception as proxy_error:
+                    st.warning(f"⚠️ Proxy configuration failed: {str(proxy_error)}")
+                    continue
             
             transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=["en"])
             return transcript_list
@@ -140,6 +176,20 @@ def get_transcript_with_retry(video_id, max_attempts=3, use_proxy=False):
                     continue
                 else:
                     raise Exception("YouTube is blocking requests from this IP. Try using a proxy or different network.")
+            elif "invalid" in error_msg.lower() and "url" in error_msg.lower():
+                if attempt < max_attempts - 1:
+                    st.warning(f"⚠️ Invalid URL on attempt {attempt + 1}. Retrying without proxy...")
+                    # Clear proxy settings and retry
+                    try:
+                        import os
+                        os.environ.pop('HTTP_PROXY', None)
+                        os.environ.pop('HTTPS_PROXY', None)
+                    except:
+                        pass
+                    time.sleep(random.uniform(1, 2))
+                    continue
+                else:
+                    raise Exception("URL validation failed. Please check the video URL or try without proxy.")
             else:
                 raise e
     
@@ -186,54 +236,81 @@ if (video_url or manual_transcript) and question:
     transcript_text = None
     
     if input_method == "YouTube URL":
-        video_id = extract_video_id(video_url)
-        
-        if not video_id:
-            st.error("Invalid YouTube URL. Please check and try again.")
+        # Validate URL first
+        is_valid, message = validate_youtube_url(video_url)
+        if not is_valid:
+            st.error(f"❌ {message}")
+            st.info("💡 Please enter a valid YouTube URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)")
         else:
-            with st.spinner("Loading transcript and preparing response..."):
-                try:
-                    # Get transcript with retry logic
-                    transcript_list = get_transcript_with_retry(video_id, retry_attempts, use_proxy)
-                    transcript_text = " ".join(chunk["text"] for chunk in transcript_list)
-                    
-                except TranscriptsDisabled:
-                    st.error("❌ Transcript is disabled for this video.")
-                    st.info("💡 Try a different video that has captions enabled, or use the manual transcript option.")
-                except Exception as e:
-                    error_msg = str(e)
-                    if "blocked" in error_msg.lower() or "ip" in error_msg.lower():
-                        st.error("❌ YouTube IP Blocking Detected")
-                        st.markdown("""
-                        ### 🔧 Solutions to try:
+            video_id = extract_video_id(video_url)
+            
+            if not video_id:
+                st.error("Could not extract video ID from URL. Please check and try again.")
+            else:
+                with st.spinner("Loading transcript and preparing response..."):
+                    try:
+                        # Get transcript with retry logic
+                        transcript_list = get_transcript_with_retry(video_id, retry_attempts, use_proxy)
+                        transcript_text = " ".join(chunk["text"] for chunk in transcript_list)
                         
-                        **1. Enable Proxy (Recommended)**
-                        - Check the "Use Proxy" option in the sidebar
-                        - This will attempt to use free proxies to bypass the block
-                        
-                        **2. Use Manual Transcript (Easiest)**
-                        - Switch to "Manual Transcript" input method
-                        - Copy transcript directly from YouTube
-                        - This bypasses all API restrictions
-                        
-                        **3. Try Different Network**
-                        - Use a different internet connection
-                        - Try from a mobile hotspot
-                        
-                        **4. Wait and Retry**
-                        - YouTube blocks are usually temporary
-                        - Wait 10-15 minutes and try again
-                        
-                        **5. Alternative Solutions**
-                        - Use a VPN service
-                        - Try from a different location
-                        """)
-                    elif "quota" in error_msg.lower():
-                        st.error("❌ API Quota Exceeded")
-                        st.info("💡 Check your Google API key usage and quotas.")
-                    else:
-                        st.error(f"❌ An error occurred: {error_msg}")
-                        st.info("💡 Please check your API key and try again.")
+                    except TranscriptsDisabled:
+                        st.error("❌ Transcript is disabled for this video.")
+                        st.info("💡 Try a different video that has captions enabled, or use the manual transcript option.")
+                    except Exception as e:
+                        error_msg = str(e)
+                        if "blocked" in error_msg.lower() or "ip" in error_msg.lower():
+                            st.error("❌ YouTube IP Blocking Detected")
+                            st.markdown("""
+                            ### 🔧 Solutions to try:
+                            
+                            **1. Enable Proxy (Recommended)**
+                            - Check the "Use Proxy" option in the sidebar
+                            - This will attempt to use free proxies to bypass the block
+                            
+                            **2. Use Manual Transcript (Easiest)**
+                            - Switch to "Manual Transcript" input method
+                            - Copy transcript directly from YouTube
+                            - This bypasses all API restrictions
+                            
+                            **3. Try Different Network**
+                            - Use a different internet connection
+                            - Try from a mobile hotspot
+                            
+                            **4. Wait and Retry**
+                            - YouTube blocks are usually temporary
+                            - Wait 10-15 minutes and try again
+                            
+                            **5. Alternative Solutions**
+                            - Use a VPN service
+                            - Try from a different location
+                            """)
+                        elif "quota" in error_msg.lower():
+                            st.error("❌ API Quota Exceeded")
+                            st.info("💡 Check your Google API key usage and quotas.")
+                        elif "invalid" in error_msg.lower() and "url" in error_msg.lower():
+                            st.error("❌ URL Validation Error")
+                            st.markdown("""
+                            ### 🔧 Solutions to try:
+                            
+                            **1. Disable Proxy (Recommended)**
+                            - Uncheck "Use Proxy" in the sidebar
+                            - Try again without proxy
+                            
+                            **2. Use Manual Transcript**
+                            - Switch to "Manual Transcript" input method
+                            - This bypasses all API and proxy issues
+                            
+                            **3. Check Video URL**
+                            - Ensure the YouTube URL is valid
+                            - Try a different video
+                            
+                            **4. Clear Browser Cache**
+                            - Sometimes cached data causes issues
+                            - Refresh the page and try again
+                            """)
+                        else:
+                            st.error(f"❌ An error occurred: {error_msg}")
+                            st.info("💡 Please check your API key and try again.")
     else:
         # Manual transcript input
         if not manual_transcript.strip():
