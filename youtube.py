@@ -4,8 +4,6 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
-from langchain_core.runnables import RunnableParallel, RunnablePassthrough, RunnableLambda
-from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
 import re
 import os
@@ -49,6 +47,10 @@ def format_docs(retrieved_docs):
 def process_transcript_and_answer(transcript_text, question):
     """Process transcript and generate answer using LangChain"""
     try:
+        # Configure for synchronous operation
+        import os
+        os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")
+        
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         chunks = splitter.create_documents([transcript_text])
 
@@ -69,16 +71,15 @@ def process_transcript_and_answer(transcript_text, question):
             input_variables=['context', 'question']
         )
 
-        parallel_chain = RunnableParallel({
-            'context': retriever | RunnableLambda(format_docs),
-            'question': RunnablePassthrough()
-        })
-
-        parser = StrOutputParser()
-        chain = parallel_chain | prompt | llm | parser
-
-        answer = chain.invoke(question)
-        return answer
+        # Get context first
+        docs = retriever.get_relevant_documents(question)
+        context = format_docs(docs)
+        
+        # Generate answer directly
+        formatted_prompt = prompt.format(context=context, question=question)
+        answer = llm.invoke(formatted_prompt)
+        
+        return answer.content
     except Exception as e:
         raise Exception(f"Error processing transcript: {str(e)}")
 
