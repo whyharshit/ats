@@ -7,39 +7,16 @@ import base64
 from PIL import Image
 from dotenv import load_dotenv
 
-# ✅ Load environment variables
+
 load_dotenv()
 
-# ✅ Get API key and Poppler path from environment variables
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-# For cloud deployment, Poppler is installed system-wide
-POPPLER_PATH = os.getenv("POPPLER_PATH", None)
 
-# ✅ Validate environment variables
-if not GOOGLE_API_KEY:
-    st.error("❌ GOOGLE_API_KEY not found in environment variables.")
-    st.markdown("""
-    ### 🔧 How to fix this:
-    
-    **For Streamlit Cloud:**
-    1. Go to your app settings at [share.streamlit.io](https://share.streamlit.io)
-    2. Click on your app → Settings → Secrets
-    3. Add: `GOOGLE_API_KEY = "your_api_key_here"`
-    
-    **For local development:**
-    1. Create a `.env` file in your project directory
-    2. Add: `GOOGLE_API_KEY=your_api_key_here`
-    
-    **Get your API key from:** [Google AI Studio](https://makersuite.google.com/app/apikey)
-    """)
-    st.stop()
 
-# ✅ For cloud deployment, we'll need to handle PDF processing differently
+
 def is_cloud_environment():
     """Check if running in a cloud environment"""
     return os.getenv("STREAMLIT_SERVER_PORT") is not None or os.getenv("PORT") is not None
 
-# ✅ Test API key functionality
 def test_api_key():
     """Test if the API key is working"""
     try:
@@ -49,14 +26,13 @@ def test_api_key():
     except Exception as e:
         return False, f"API key test failed: {str(e)}"
 
-# ✅ Load and process the uploaded PDF
 def input_pdf_setup(uploaded_file):
     if uploaded_file is not None:
         try:
-            # For cloud environments, we'll use text extraction
+         
             if is_cloud_environment():
                 st.info("📄 Processing PDF as text in cloud environment...")
-                # Extract text directly from PDF
+             
                 import PyPDF2
                 pdf_reader = PyPDF2.PdfReader(uploaded_file)
                 text_content = ""
@@ -70,16 +46,16 @@ def input_pdf_setup(uploaded_file):
                 st.success(f"✅ Successfully extracted {len(text_content)} characters from PDF")
                 return {"type": "text", "content": text_content}
             else:
-                # Local environment with Poppler
+              r
                 images = pdf2image.convert_from_bytes(uploaded_file.read(), poppler_path=POPPLER_PATH)
                 first_page = images[0]
 
-                # Convert first page to base64 JPEG
+                
                 image_byte_arr = io.BytesIO()
                 first_page.save(image_byte_arr, format='JPEG')
                 image_byte_arr = image_byte_arr.getvalue()
 
-                # Return base64-encoded image string
+               
                 base64_image = base64.b64encode(image_byte_arr).decode()
                 return {"type": "image", "content": base64_image}
         except Exception as e:
@@ -90,7 +66,7 @@ def input_pdf_setup(uploaded_file):
         raise FileNotFoundError("No file uploaded")
 
 
-# ✅ Send prompt + image/text + job description to Gemini
+
 def get_gemini_response(job_desc, pdf_data, prompt):
     try:
         model = ChatGoogleGenerativeAI(model="models/gemini-1.5-flash-latest")
@@ -123,9 +99,9 @@ def get_gemini_response(job_desc, pdf_data, prompt):
                     ]
                 }
         else:
-            # Fallback for old format
+           
             if isinstance(pdf_data, str) and len(pdf_data) > 1000:
-                # Assume it's text content
+           
                 message = {
                     "role": "user",
                     "content": [
@@ -135,7 +111,7 @@ def get_gemini_response(job_desc, pdf_data, prompt):
                     ]
                 }
             else:
-                # Assume it's base64 image
+                
                 message = {
                     "role": "user",
                     "content": [
