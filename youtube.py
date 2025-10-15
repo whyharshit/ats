@@ -70,12 +70,12 @@ if st.button("🚀 Get Answer", type="primary"):
                 with st.expander("📄 Context used"):
                     st.text(context[:500] + "..." if len(context) > 500 else context)
             except TranscriptsDisabled:
-                st.error("❌ No captions available for this video")
-                st.info("💡 Try a different video with English captions enabled")
+                st.error("No captions available for this video")
+                st.info("Try a different video with English captions enabled")
             except Exception as e:
                 error_msg = str(e)
                 if "blocked" in error_msg.lower() or "ip" in error_msg.lower():
-                    st.error("❌ YouTube IP Blocking Detected")
+                    st.error("YouTube IP Blocking Detected")
                     st.markdown("""
                     **Solutions:**
                     - Try a different network
@@ -83,7 +83,7 @@ if st.button("🚀 Get Answer", type="primary"):
                     - Wait a few minutes and try again
                     """)
                 elif "API_KEY_INVALID" in error_msg or "400" in error_msg:
-                    st.error("❌ API Key Error")
+                    st.error("API Key Error")
                     st.markdown("""
                     **Your API key is invalid or expired.**
                     
@@ -94,25 +94,9 @@ if st.button("🚀 Get Answer", type="primary"):
                     4. Restart the app
                     """)
                 else:
-                    st.error(f"❌ Error: {error_msg}")
-                    st.info("💡 Please check your Google API key in .env file")
+                    st.error(f"Error: {error_msg}")
+                    st.info("Please check your Google API key in .env file")
     else:
         st.warning("⚠️ Please enter both URL and question")
 
-# Sidebar with help
-with st.sidebar:
-    st.header("ℹ️ Help")
-    st.markdown("""
-    **How to use:**
-    1. Paste a YouTube URL
-    2. Ask a question about the video
-    3. Get AI-powered answers!
-    
-    **Requirements:**
-    - Video must have English captions
-    - Valid Google API key in .env file
-    
-    **Tips:**
-    - Ask specific questions for better answers
-    - Works with any YouTube video with captions
-    """)
+
