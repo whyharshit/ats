@@ -82,7 +82,7 @@ if st.button("🚀 Get Answer", type="primary"):
                     st.error("Captions not available for this video.")
            
                 elif "API_KEY_INVALID" in error_msg or "400" in error_msg:
-                    st.error("API Key Error
+                    st.error("API Key Error")
                     
                     st.markdown("""
                     **Your API key is invalid or expired.**
