@@ -9,4 +9,5 @@ langchain>=0.1.0
 langchain-community>=0.0.10
 langchain-core>=0.1.0
 faiss-cpu>=1.7.4
-requests>=2.31.0 
+requests>=2.31.0
+pytube
