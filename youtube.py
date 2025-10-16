@@ -74,16 +74,16 @@ if st.button("🚀 Get Answer", type="primary"):
                 st.info("Try a different video with English captions enabled")
             except Exception as e:
                 error_msg = str(e)
-                if "blocked" in error_msg.lower() or "ip" in error_msg.lower():
-                    st.error("YouTube IP Blocking Detected")
-                    st.markdown("""
-                    **Solutions:**
-                    - Try a different network
-                    - Use a VPN
-                    - Wait a few minutes and try again
-                    """)
+                if "429" in error_msg or "Too Many Requests" in error_msg:
+                    st.error("YouTube Rate Limit Hit — Please wait a few minutes.")
+                elif "403" in error_msg or "forbidden" in error_msg.lower():
+                    st.error("Access forbidden. Check your network or try a VPN.")
+                elif "TranscriptsDisabled" in error_msg:
+                    st.error("Captions not available for this video.")
+           
                 elif "API_KEY_INVALID" in error_msg or "400" in error_msg:
-                    st.error("API Key Error")
+                    st.error("API Key Error
+                    
                     st.markdown("""
                     **Your API key is invalid or expired.**
                     
