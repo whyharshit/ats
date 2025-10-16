@@ -46,7 +46,7 @@ def input_pdf_setup(uploaded_file):
                 st.success(f"✅ Successfully extracted {len(text_content)} characters from PDF")
                 return {"type": "text", "content": text_content}
             else:
-              r
+              
                 images = pdf2image.convert_from_bytes(uploaded_file.read(), poppler_path=POPPLER_PATH)
                 first_page = images[0]
 
